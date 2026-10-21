@@ -167,30 +167,25 @@ form.find button { border: 0; border-left: 1px solid var(--rule); border-radius:
 <script>
 (async () => {
 "use strict";
-const SRC = "M11_complete_discovery_tree.svg";
 const hint0 = document.getElementById("hint");
-let svgText;
-try { const r = await fetch(SRC); if (!r.ok) throw new Error(r.status); svgText = await r.text(); }
-catch (err) { hint0.textContent = "Couldn't load " + SRC + ". Upload it to the repository next to index.html, then reload."; return; }
-const vb = /viewBox="0 0 ([\d.]+) ([\d.]+)"/.exec(svgText) || [0, 31172, 3100];
-const WW = +vb[1], WH = +vb[2];
-const circ = [...svgText.matchAll(/<circle cx="([-\d.]+)" cy="([-\d.]+)"/g)];
-const edges = [...svgText.matchAll(/<path d="M ([-\d.]+),([-\d.]+) L ([-\d.]+),([-\d.]+)" stroke="(#[0-9a-fA-F]{6})"/g)];
-const N = circ.length;
+let raw;
+try {
+  raw = await Promise.all(["x1", "x2", "x3", "x4", "k", "c"].map(async f => {
+    const r = await fetch("data/" + f + ".txt"); if (!r.ok) throw new Error(f);
+    return (await r.text()).replace(/\s+/g, "");
+  }));
+} catch (err) { hint0.textContent = "Couldn't load the tree data. Reload the page to try again."; return; }
+const xs = raw.slice(0, 4).join(""), KS = raw[4], CS = raw[5];
+const WW = 31172, WH = 3100, N = KS.length;
+if (xs.length !== N * 5 || CS.length !== N) { hint0.textContent = "The tree data files are incomplete."; return; }
 const XI = new Int32Array(N), X = new Float64Array(N), Y = new Float64Array(N), D = new Uint8Array(N), P = new Int32Array(N), COL = new Uint8Array(N);
+P[0] = -1;
+for (let p = 0, next = 1; p < N; p++) for (let k = +KS[p]; k > 0; k--, next++) { P[next] = p; D[next] = D[p] + 1; }
 const at = new Map();
 for (let i = 0; i < N; i++) {
-  XI[i] = Math.round(+circ[i][1] * 100); X[i] = XI[i] / 100; Y[i] = +circ[i][2]; D[i] = Math.round((Y[i] - 65) / 110);
+  XI[i] = parseInt(xs.substr(i * 5, 5), 36); X[i] = XI[i] / 100; Y[i] = 65 + 110 * D[i]; COL[i] = CS[i] === "1" ? 1 : 0;
   const k = XI[i] + ":" + D[i]; (at.get(k) || at.set(k, []).get(k)).push(i);
 }
-P[0] = -1;
-let last = 0;
-edges.forEach((m, k) => {
-  const ch = k + 1, cands = at.get(Math.round(+m[1] * 100) + ":" + Math.round((+m[2] - 65) / 110)) || [];
-  let p = -1; for (const c of cands) if (c < ch && c >= last && (p < 0 || c < p)) p = c;
-  if (p < 0) p = cands.find(c => c < ch) ?? 0;
-  P[ch] = p; last = p; COL[ch] = m[5].toLowerCase() === "#dca52b" ? 1 : 0;
-});
 const LEVELS = Math.max(...D) + 1;
 const kids = Array.from({ length: N }, () => []);
 for (let i = 1; i < N; i++) kids[P[i]].push(i);
